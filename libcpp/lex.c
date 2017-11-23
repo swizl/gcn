@@ -1525,6 +1525,102 @@ lex_identifier (cpp_reader *pfile, const uchar *base, bool starts_ucn,
   return result;
 }
 
+bool check_utf8_char(cppchar_t c)
+{
+	if ((0xFC <=c) && (c < 0xFE))
+		return true;
+	else if ((0xF8 <= c) && (c < 0xFC))
+		return true;
+	else if ((0xF0 <= c) && (c < 0xF8))
+		return true;
+	else if ((0xE0 <= c) && (c < 0xF0))
+		return true;
+	else if ((0xC0 <= c) && (c < 0xE0))
+		return true;
+	else if ((0x80 <= c) && (c < 0xC0))
+		return true;
+	return false;
+}
+
+/* Lex an utf-8 identifier starting at BUFFER->CUR - 1.  */
+static cpp_hashnode *
+lex_utf8_identifier (cpp_reader *pfile, const uchar *base, bool starts_ucn,
+		struct normalize_state *nst, cpp_hashnode **spelling)
+{
+  cpp_hashnode *result;
+  const uchar *cur;
+  unsigned int len;
+  unsigned int hash = HT_HASHSTEP (0, *base);
+
+  cur = pfile->buffer->cur;
+  if (! starts_ucn)
+    {
+      while (check_utf8_char (*cur))
+	{
+	  hash = HT_HASHSTEP (hash, *cur);
+	  cur++;
+	}
+      NORMALIZE_STATE_UPDATE_IDNUM (nst, *(cur - 1));
+    }
+  pfile->buffer->cur = cur;
+  if (starts_ucn || forms_identifier_p (pfile, false, nst))
+    {
+      /* Slower version for identifiers containing UCNs (or $).  */
+      do {
+	while (ISIDNUM (*pfile->buffer->cur))
+	  {
+	    NORMALIZE_STATE_UPDATE_IDNUM (nst, *pfile->buffer->cur);
+	    pfile->buffer->cur++;
+	  }
+      } while (forms_identifier_p (pfile, false, nst));
+      result = _cpp_interpret_identifier (pfile, base,
+					  pfile->buffer->cur - base);
+      *spelling = cpp_lookup (pfile, base, pfile->buffer->cur - base);
+    }
+  else
+    {
+      len = cur - base;
+      hash = HT_HASHFINISH (hash, len);
+
+      result = CPP_HASHNODE (ht_lookup_with_hash (pfile->hash_table,
+						  base, len, hash, HT_ALLOC));
+      *spelling = result;
+    }
+
+  /* Rarely, identifiers require diagnostics when lexed.  */
+  if (__builtin_expect ((result->flags & NODE_DIAGNOSTIC)
+			&& !pfile->state.skipping, 0))
+    {
+      /* It is allowed to poison the same identifier twice.  */
+      if ((result->flags & NODE_POISONED) && !pfile->state.poisoned_ok)
+	cpp_error (pfile, CPP_DL_ERROR, "attempt to use poisoned \"%s\"",
+		   NODE_NAME (result));
+
+      /* Constraint 6.10.3.5: __VA_ARGS__ should only appear in the
+	 replacement list of a variadic macro.  */
+      if (result == pfile->spec_nodes.n__VA_ARGS__
+	  && !pfile->state.va_args_ok)
+	{
+	  if (CPP_OPTION (pfile, cplusplus))
+	    cpp_error (pfile, CPP_DL_PEDWARN,
+		       "__VA_ARGS__ can only appear in the expansion"
+		       " of a C++11 variadic macro");
+	  else
+	    cpp_error (pfile, CPP_DL_PEDWARN,
+		       "__VA_ARGS__ can only appear in the expansion"
+		       " of a C99 variadic macro");
+	}
+
+      /* For -Wc++-compat, warn about use of C++ named operators.  */
+      if (result->flags & NODE_WARN_OPERATOR)
+	cpp_warning (pfile, CPP_W_CXX_OPERATOR_NAMES,
+		     "identifier \"%s\" is a special operator name in C++",
+		     NODE_NAME (result));
+    }
+
+  return result;
+}
+
 /* Lex a number to NUMBER starting at BUFFER->CUR - 1.  */
 static void
 lex_number (cpp_reader *pfile, cpp_string *number,
@@ -3124,7 +3220,18 @@ _cpp_lex_direct (cpp_reader *pfile)
       /* FALLTHRU */
 
     default:
+		if (check_utf8_char(c))
+		{
+			struct normalize_state nst = INITIAL_NORMALIZE_STATE;
+			result->type = CPP_NAME;
+			result->val.node.node = lex_utf8_identifier(pfile, buffer->cur - 1, false,
+				&nst, &result->val.node.spelling);
+			warn_about_normalization(pfile, result, &nst);
+		}
+		else
+		{
       create_literal (pfile, result, buffer->cur - 1, 1, CPP_OTHER);
+		}
       break;
     }
 

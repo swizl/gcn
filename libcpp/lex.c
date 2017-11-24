@@ -1525,7 +1525,7 @@ lex_identifier (cpp_reader *pfile, const uchar *base, bool starts_ucn,
   return result;
 }
 
-bool check_utf8_char(cppchar_t c)
+bool is_utf8_char(cppchar_t c)
 {
 	if ((0xFC <=c) && (c < 0xFE))
 		return true;
@@ -1555,7 +1555,7 @@ lex_utf8_identifier (cpp_reader *pfile, const uchar *base, bool starts_ucn,
   cur = pfile->buffer->cur;
   if (! starts_ucn)
     {
-      while (check_utf8_char (*cur))
+      while (is_utf8_char (*cur))
 	{
 	  hash = HT_HASHSTEP (hash, *cur);
 	  cur++;
@@ -3220,7 +3220,7 @@ _cpp_lex_direct (cpp_reader *pfile)
       /* FALLTHRU */
 
     default:
-		if (check_utf8_char(c))
+		if (is_utf8_char(c))
 		{
 			struct normalize_state nst = INITIAL_NORMALIZE_STATE;
 			result->type = CPP_NAME;

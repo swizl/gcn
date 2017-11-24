@@ -143,23 +143,40 @@ static void cpp_pop_definition (cpp_reader *, struct def_pragma_macro *);
 
 #define DIRECTIVE_TABLE							\
 D(define,	T_DEFINE = 0,	KANDR,     IN_I)	   /* 270554 */ \
+A("定义", define,	T_DEFINE,	KANDR,     IN_I)	   /* 270554 */ \
 D(include,	T_INCLUDE,	KANDR,     INCL | EXPAND)  /*  52262 */ \
+A("含", include,	T_INCLUDE,	KANDR,     INCL | EXPAND)  /*  52262 */ \
 D(endif,	T_ENDIF,	KANDR,     COND)	   /*  45855 */ \
+A("了如", endif,	T_ENDIF,	KANDR,     COND)	   /*  45855 */ \
 D(ifdef,	T_IFDEF,	KANDR,     COND | IF_COND) /*  22000 */ \
+A("如定义", ifdef,	T_IFDEF,	KANDR,     COND | IF_COND) /*  22000 */ \
 D(if,		T_IF,		KANDR, COND | IF_COND | EXPAND) /*  18162 */ \
+A("如", if,		T_IF,		KANDR, COND | IF_COND | EXPAND) /*  18162 */ \
 D(else,		T_ELSE,		KANDR,     COND)	   /*   9863 */ \
+A("另", else,		T_ELSE,		KANDR,     COND)	   /*   9863 */ \
 D(ifndef,	T_IFNDEF,	KANDR,     COND | IF_COND) /*   9675 */ \
+A("如未定义", ifndef,	T_IFNDEF,	KANDR,     COND | IF_COND) /*   9675 */ \
 D(undef,	T_UNDEF,	KANDR,     IN_I)	   /*   4837 */ \
+A("消定义", undef,	T_UNDEF,	KANDR,     IN_I)	   /*   4837 */ \
 D(line,		T_LINE,		KANDR,     EXPAND)	   /*   2465 */ \
+A("行", line,		T_LINE,		KANDR,     EXPAND)	   /*   2465 */ \
 D(elif,		T_ELIF,		STDC89,    COND | EXPAND)  /*    610 */ \
+A("另如", elif,		T_ELIF,		STDC89,    COND | EXPAND)  /*    610 */ \
 D(error,	T_ERROR,	STDC89,    0)		   /*    475 */ \
+A("错误", error,	T_ERROR,	STDC89,    0)		   /*    475 */ \
 D(pragma,	T_PRAGMA,	STDC89,    IN_I)	   /*    195 */ \
+A("杂注", pragma,	T_PRAGMA,	STDC89,    IN_I)	   /*    195 */ \
 D(warning,	T_WARNING,	EXTENSION, 0)		   /*     22 */ \
+A("告警", warning,	T_WARNING,	EXTENSION, 0)		   /*     22 */ \
 D(include_next,	T_INCLUDE_NEXT,	EXTENSION, INCL | EXPAND)  /*     19 */ \
+A("含下个", include_next,	T_INCLUDE_NEXT,	EXTENSION, INCL | EXPAND)  /*     19 */ \
 D(ident,	T_IDENT,	EXTENSION, IN_I)           /*     11 */ \
 D(import,	T_IMPORT,	EXTENSION, INCL | EXPAND)  /* 0 ObjC */	\
+A("导入", import,	T_IMPORT,	EXTENSION, INCL | EXPAND)  /* 0 ObjC */	\
 D(assert,	T_ASSERT,	EXTENSION, DEPRECATED)	   /* 0 SVR4 */	\
+A("断言", assert,	T_ASSERT,	EXTENSION, DEPRECATED)	   /* 0 SVR4 */	\
 D(unassert,	T_UNASSERT,	EXTENSION, DEPRECATED)	   /* 0 SVR4 */	\
+A("消断言", unassert,	T_UNASSERT,	EXTENSION, DEPRECATED)	   /* 0 SVR4 */	\
 D(sccs,		T_SCCS,		EXTENSION, IN_I)           /* 0 SVR4? */
 
 /* #sccs is synonymous with #ident.  */
@@ -168,10 +185,13 @@ D(sccs,		T_SCCS,		EXTENSION, IN_I)           /* 0 SVR4? */
 /* Use the table to generate a series of prototypes, an enum for the
    directive names, and an array of directive handlers.  */
 
+#define A(name_cn, name, t, o, f)
 #define D(name, t, o, f) static void do_##name (cpp_reader *);
 DIRECTIVE_TABLE
 #undef D
+#undef A
 
+#define A(n_cn, n, tag, o, f) tag ## _CN,
 #define D(n, tag, o, f) tag,
 enum
 {
@@ -179,7 +199,11 @@ enum
   N_DIRECTIVES
 };
 #undef D
+#undef A
 
+#define A(name_cn, name, t, origin, flags) \
+{ do_##name, (const uchar *) name_cn, \
+  sizeof (name_cn) - 1, origin, flags },
 #define D(name, t, origin, flags) \
 { do_##name, (const uchar *) #name, \
   sizeof #name - 1, origin, flags },
@@ -188,15 +212,18 @@ static const directive dtable[] =
 DIRECTIVE_TABLE
 };
 #undef D
+#undef A
 
 /* A NULL-terminated array of directive names for use
    when suggesting corrections for misspelled directives.  */
+#define A(name_cn, name, t, origin, flags) name_cn,
 #define D(name, t, origin, flags) #name,
 static const char * const directive_names[] = {
 DIRECTIVE_TABLE
   NULL
 };
 #undef D
+#undef A
 
 #undef DIRECTIVE_TABLE
 
